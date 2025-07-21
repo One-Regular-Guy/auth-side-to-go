@@ -51,7 +51,7 @@ func main() {
 	stepCaProvisionerPassword := os.Getenv("STEP_CA_PROVISIONER_PASSWORD")
 
 	if err != nil {
-		log.Fatalf("Erro ao carregar o arquivo .env: %v", err)
+		log.Println("Error loading environment variables")
 	}
 
 	// Connect to LDAP server
@@ -62,7 +62,7 @@ func main() {
 	defer func(ldapConn *ldap.Conn) {
 		err := ldapConn.Close()
 		if err != nil {
-
+			log.Fatal(err)
 		}
 	}(ldapConn)
 	// Mongo connection
