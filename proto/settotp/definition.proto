@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package settotp;
+
+option go_package = "proto/settotp;settotp";
+
+service SetTotpService {
+  rpc SetTotp (SetTotpRequest) returns (SetTotpResponse);
+}
+
+message SetTotpRequest {
+  string uid = 1;
+}
+
+message SetTotpResponse {
+  string code = 1;
+}

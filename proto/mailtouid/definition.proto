@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package mailtouid;
+
+option go_package = "proto/mailtouid;mailtouid";
+
+service MailToUidService {
+  rpc MailToUid (MailToUidRequest) returns (MailToUidResponse);
+}
+
+message MailToUidRequest {
+  string mail = 1;
+}
+
+message MailToUidResponse {
+  string uid = 1;
+}
