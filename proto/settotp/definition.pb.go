@@ -68,6 +68,7 @@ func (x *SetTotpRequest) GetUid() string {
 type SetTotpResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Cert          string                 `protobuf:"bytes,2,opt,name=cert,proto3" json:"cert,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -109,15 +110,23 @@ func (x *SetTotpResponse) GetCode() string {
 	return ""
 }
 
+func (x *SetTotpResponse) GetCert() string {
+	if x != nil {
+		return x.Cert
+	}
+	return ""
+}
+
 var File_proto_settotp_definition_proto protoreflect.FileDescriptor
 
 const file_proto_settotp_definition_proto_rawDesc = "" +
 	"\n" +
 	"\x1eproto/settotp/definition.proto\x12\asettotp\"\"\n" +
 	"\x0eSetTotpRequest\x12\x10\n" +
-	"\x03uid\x18\x01 \x01(\tR\x03uid\"%\n" +
+	"\x03uid\x18\x01 \x01(\tR\x03uid\"9\n" +
 	"\x0fSetTotpResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code2N\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04cert\x18\x02 \x01(\tR\x04cert2N\n" +
 	"\x0eSetTotpService\x12<\n" +
 	"\aSetTotp\x12\x17.settotp.SetTotpRequest\x1a\x18.settotp.SetTotpResponseB\x17Z\x15proto/settotp;settotpb\x06proto3"
 

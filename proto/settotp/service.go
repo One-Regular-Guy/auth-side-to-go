@@ -1,12 +1,16 @@
 package settotp
 
 import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"github.com/pquerna/otp/totp"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"io/ioutil"
+	"image/png"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 type Service interface {
@@ -15,6 +19,7 @@ type Service interface {
 	StepCaFingerprint() string
 	StepCaProvisioner() string
 	StepCaProvisionerPassword() string
+	GenTotpAndCert(uid string) (string, string, error)
 }
 type service struct {
 	collection                *mongo.Collection
@@ -49,14 +54,28 @@ func NewService(mongoCollection *mongo.Collection, stepCaUrl, stepCaFingerprint,
 	}
 }
 
-func (s *service) GenTotpAndCert(uid string) (string, error) {
+func (s *service) GenTotpAndCert(uid string) (string, string, error) {
+
+	totpSecret, err := totp.Generate(
+		totp.GenerateOpts{
+			Issuer:      "AuthSideToGo",
+			AccountName: "VPN Coorporativa",
+		})
+	if err != nil {
+		return "", "", err
+	}
+
+	_, err = s.Collection().InsertOne(context.Background(), bson.M{"_id": uid, "totp_secret": totpSecret})
+	if err != nil {
+		return "", "", err
+	} // Exemplo de inserção de TOTP
 
 	certDir := uid + "/cert.crt"
 	certKey := uid + "/cert.key"
 	cmd := exec.Command("step", "ca", "certificate",
-		"vpn.example.com", // Nome comum do certificado
-		certDir,           // Arquivo de saída do certificado
-		certKey,           // Arquivo de saída da chave privada
+		uid,     // Nome comum do certificado
+		certDir, // Arquivo de saída do certificado
+		certKey, // Arquivo de saída da chave privada
 		"--ca-url", s.StepCaUrl(),
 		"--fingerprint", s.StepCaFingerprint(),
 		"--provisioner", s.StepCaProvisioner(),
@@ -69,11 +88,11 @@ func (s *service) GenTotpAndCert(uid string) (string, error) {
 	}
 
 	// Leitura dos arquivos gerados
-	cert, err := os.ReadFile("cert.crt")
+	cert, err := os.ReadFile(certDir)
 	if err != nil {
 		log.Fatalf("Erro ao ler arquivo de certificado: %v", err)
 	}
-	key, err := os.ReadFile("cert.key")
+	key, err := os.ReadFile(certKey)
 	if err != nil {
 		log.Fatalf("Erro ao ler arquivo de chave: %v", err)
 	}
@@ -87,11 +106,16 @@ func (s *service) GenTotpAndCert(uid string) (string, error) {
 ` + string(key) + `
 </key>
 `
-	err := os.WriteFile("client.ovpn", []byte(ovpn), 0600)
+	img, err := totpSecret.Image(200, 200)
 	if err != nil {
-		log.Fatalf("Erro ao escrever arquivo .ovpn: %v", err)
+		return "", "", err
 	}
-	return strings.TrimSpace(string(output)), nil
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return "", "", err
+	}
+	imgBase64 := base64.StdEncoding.EncodeToString(buf.Bytes())
+	return ovpn, imgBase64, nil
 }
 
 var ServiceInstance Service

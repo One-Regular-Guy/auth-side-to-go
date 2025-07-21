@@ -5,6 +5,7 @@ go 1.24.5
 require (
 	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/joho/godotenv v1.5.1
+	github.com/pquerna/otp v1.5.0
 	go.mongodb.org/mongo-driver v1.17.4
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
@@ -12,6 +13,7 @@ require (
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
