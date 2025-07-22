@@ -42,10 +42,11 @@ func NewService(conn *ldap.Conn, base, bind, password string) Service {
 	}
 }
 func (s *service) Uid(email string) (string, error) {
-	presetErr := fmt.Errorf("usuário não encontrado")
+	presetErr := fmt.Errorf("User not found")
 	err := s.Conn().Bind(s.BindDn(), s.Password())
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error on bind %v", err)
+		return "", presetErr
 	}
 	searchRequest := ldap.NewSearchRequest(
 		s.BaseDn(), // Base DN
@@ -57,11 +58,12 @@ func (s *service) Uid(email string) (string, error) {
 
 	sr, err := s.Conn().Search(searchRequest)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error when searching uid", err)
+		return "", err
 	}
 
 	if len(sr.Entries) == 0 {
-		log.Print("Usuário não encontrado")
+		log.Print("User not found")
 		return "", presetErr
 	}
 	uid := sr.Entries[0].GetAttributeValue("uid")

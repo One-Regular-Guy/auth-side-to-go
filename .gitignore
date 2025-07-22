@@ -33,3 +33,4 @@ go.work.sum
 /.idea/*
 cert.pem
 key.pem
+pass.txt

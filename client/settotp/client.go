@@ -3,36 +3,52 @@ package main
 import (
 	"context"
 	"github.com/One-Regular-Guy/auth-side-to-go/proto/settotp"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"log"
+	"os"
 	"time"
 )
 
 func main() {
-	// Carrega as credenciais TLS
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading dot env: %v", err)
+	}
+	remoteAddr := os.Getenv("REMOTE_ADDR")
+	if remoteAddr == "" {
+		log.Fatal("REMOTE_ADDR env variable is not set")
+	}
+	uid := os.Getenv("UID")
+	if uid == "" {
+		log.Fatal("UID env variable is not set")
+	}
+	// Load TLS credentials
 	creds := credentials.NewClientTLSFromCert(nil, "")
 
-	// Conecta ao servidor
-	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(creds))
+	// Create a connection to the server
+	conn, err := grpc.NewClient(remoteAddr+":50051", grpc.WithTransportCredentials(creds))
 	if err != nil {
-		log.Fatalf("Falha ao conectar: %v", err)
+		log.Fatalf("Create Connection Failed: %v", err)
 	}
-	defer conn.Close()
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			log.Fatalf("Close Connection Failed: %v", err)
+		}
+	}(conn)
 
-	// Cria o client
 	client := settotp.NewSetTotpServiceClient(conn)
 
-	// Exemplo de chamada RPC
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Substitua por um request válido
-	req := &settotp.SetTotpRequest{Uid: "12345"}
+	req := &settotp.SetTotpRequest{Uid: uid}
 	resp, err := client.SetTotp(ctx, req)
 	if err != nil {
-		log.Fatalf("Erro ao chamar SetTotp: %v", err)
+		log.Fatalf("Error calling SetTotp: %v", err)
 	}
 
-	log.Printf("Resposta: %v", resp)
+	log.Printf("Response: %v", resp)
 }

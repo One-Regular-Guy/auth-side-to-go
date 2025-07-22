@@ -4,7 +4,7 @@ import "fmt"
 
 func RetrieveUidFromMail(mail string) (*MailToUidResponse, error) {
 	if mail == "" {
-		return nil, fmt.Errorf("fudeu")
+		return nil, fmt.Errorf("Cannot retrieve UID: email is empty")
 	}
 	uid, err := ServiceInstance.Uid(mail)
 	if err != nil {

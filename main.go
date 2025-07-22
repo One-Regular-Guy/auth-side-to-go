@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -35,6 +36,7 @@ func main() {
 	// Load environment variables
 	err := godotenv.Load()
 	// Ldap Environment Variables
+	actualHost := os.Getenv("HOST")
 	baseDn := os.Getenv("LDAP_BASE_DN")
 	bindDn := os.Getenv("LDAP_BIND_DN")
 	password := os.Getenv("LDAP_BIND_PASSWORD")
@@ -48,14 +50,43 @@ func main() {
 	stepCaUrl := os.Getenv("STEP_CA_URL")
 	stepCaFingerprint := os.Getenv("STEP_CA_FINGERPRINT")
 	stepCaProvisioner := os.Getenv("STEP_CA_PROVISIONER")
-	stepCaProvisionerPassword := os.Getenv("STEP_CA_PROVISIONER_PASSWORD")
+	stepCaProvisionerPasswordFile := os.Getenv("STEP_CA_PROVISIONER_PASSWORD")
 
 	if err != nil {
 		log.Println("Error loading environment variables")
 	}
 
+	// Bootsrap CA
+	cmd := exec.Command("step", "ca", "bootstrap",
+		"--ca-url", stepCaUrl,
+		"--fingerprint", stepCaFingerprint,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("Error when connecting to CA to bootstrap: %v\nOutput: %s", err, output)
+	}
+	err = os.Remove("cert.pem")
+	if err != nil {
+		log.Printf("Erro when removing previus cert: %v", err)
+	}
+	err = os.Remove("key.pem")
+	if err != nil {
+		log.Printf("Erro when removing previus key: %v", err)
+	}
+	cmd = exec.Command("step", "ca", "certificate",
+		actualHost,
+		"cert.pem",
+		"key.pem",
+		"--provisioner", stepCaProvisioner,
+		"--password-file", stepCaProvisionerPasswordFile,
+		"-f",
+	)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("Error when connecting to CA to gen certs: %v\nOutput: %s", err, output)
+	}
 	// Connect to LDAP server
-	ldapConn, err := ldap.Dial("tcp", ldapUrl)
+	ldapConn, err := ldap.DialURL(ldapUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,52 +96,45 @@ func main() {
 			log.Fatal(err)
 		}
 	}(ldapConn)
-	// Mongo connection
-	// Conexão com o MongoDB
+	// Connect to MongoDB
 	mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(mongoUrl).SetAuth(options.Credential{
 		Username: mongoUser,
 		Password: mongoPassword,
 	}))
 	if err != nil {
-		log.Fatalf("Erro ao conectar ao MongoDB: %v", err)
+		log.Fatalf("Error when connection to MongoDB: %v", err)
 	}
 	defer func() {
 		if err = mongoClient.Disconnect(context.Background()); err != nil {
-			log.Fatalf("Erro ao desconectar do MongoDB: %v", err)
+			log.Fatalf("Error when disconnecting MongoDB: %v", err)
 		}
 	}()
-	// Cria banco de dados e coleção
+	// Create Database and Collection
 	db := mongoClient.Database(mongoDb)
-	err = db.CreateCollection(context.Background(), mongoTotpCollection)
-	if err != nil && !mongo.IsDuplicateKeyError(err) {
-		log.Fatal(err)
-	}
 	collection := db.Collection(mongoTotpCollection)
 
 	// Set up Necessary Business Logic Variables
 	mailtouid.ServiceInstance = mailtouid.NewService(ldapConn, baseDn, bindDn, password)
-	settotp.ServiceInstance = settotp.NewService(collection, stepCaUrl, stepCaFingerprint, stepCaProvisioner, stepCaProvisionerPassword)
-	// Set up gRPC server with TLS
+	settotp.ServiceInstance = settotp.NewService(collection, stepCaProvisioner, stepCaProvisionerPasswordFile)
+
 	certFile := "cert.pem"
 	keyFile := "key.pem"
 	creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
 	if err != nil {
-		log.Fatalf("Falha ao carregar certificados: %v", err)
+		log.Fatalf("Failed to gen creds: %v", err)
 	}
 
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("Falha ao escutar: %v", err)
+		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	// TLS to gRPC server
 	grpcServer := grpc.NewServer(grpc.Creds(creds))
 
-	// Registra os serviços gRPC
 	settotp.RegisterSetTotpServiceServer(grpcServer, &settotpServer{})
 	mailtouid.RegisterMailToUidServiceServer(grpcServer, &mailtouidServer{})
 
-	log.Println("Servidor gRPC rodando - :50051")
+	log.Println("Service gRPC running - :50051")
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Falha ao servir: %v", err)
 	}
